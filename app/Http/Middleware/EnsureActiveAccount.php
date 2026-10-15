@@ -18,7 +18,7 @@ class EnsureActiveAccount
         $response->headers->set('X-Content-Type-Options', 'nosniff');
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
         $response->headers->set('X-Frame-Options', 'SAMEORIGIN');
-        if ($request->user() || $request->routeIs('unsubscribe*', 'auth.*', 'login', 'xendit.webhook', 'jobs.external')) {
+        if ($request->user() || $request->routeIs('unsubscribe*', 'auth.*', 'login', 'midtrans.webhook', 'jobs.external')) {
             $response->headers->set('Cache-Control', 'private, no-store');
         }
 

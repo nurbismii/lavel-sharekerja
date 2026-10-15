@@ -10,13 +10,14 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class JobController extends Controller
 {
     public function index(Request $request): View
     {
-        $filters = $request->validate(['education' => 'nullable|string|max:100', 'experience' => 'nullable|string|max:100', 'posted' => 'nullable|integer|in:1,7,30', 'q' => 'nullable|string|max:100', 'location' => 'nullable|string|max:100', 'category' => 'nullable|string|max:100', 'employment_type' => 'nullable|string|max:100', 'work_arrangement' => 'nullable|in:ON_SITE,HYBRID,REMOTE', 'level' => 'nullable|string|max:100', 'salary' => 'nullable|integer|min:0|max:1000000000']);
+        $filters = $request->validate(['education' => ['nullable', 'string', Rule::in(config('sharekerja.education_levels'))], 'experience' => 'nullable|string|max:100', 'posted' => 'nullable|integer|in:1,7,30', 'q' => 'nullable|string|max:100', 'location' => 'nullable|string|max:100', 'category' => 'nullable|string|max:100', 'employment_type' => 'nullable|string|max:100', 'work_arrangement' => 'nullable|in:ON_SITE,HYBRID,REMOTE', 'level' => 'nullable|string|max:100', 'salary' => 'nullable|integer|min:0|max:1000000000']);
         $query = JobPosting::live()->with('company');
         if ($filters['q'] ?? null) {
             $term = '%'.str_replace(['%', '_'], ['\\%', '\\_'], $filters['q']).'%';

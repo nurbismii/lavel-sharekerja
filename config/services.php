@@ -1,10 +1,14 @@
 <?php
 
 return [
-    'xendit' => [
-        'secret_key' => env('XENDIT_SECRET_KEY'),
-        'webhook_token' => env('XENDIT_WEBHOOK_TOKEN'),
-        'business_id' => env('XENDIT_BUSINESS_ID'),
+    'wilayah' => [
+        'base_url' => env('WILAYAH_API_URL', 'https://wilayah.id/api'),
+    ],
+    'midtrans' => [
+        'merchant_id' => env('MIDTRANS_MERCHANT_ID'),
+        'client_key' => env('MIDTRANS_CLIENT_KEY'),
+        'server_key' => env('MIDTRANS_SERVER_KEY'),
+        'is_production' => env('MIDTRANS_IS_PRODUCTION', false),
     ],
     'google' => [
         'client_id' => env('GOOGLE_CLIENT_ID'),

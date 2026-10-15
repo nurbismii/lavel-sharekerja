@@ -1,6 +1,6 @@
 @extends('layouts.app')
 @section('content')
-<div class="container section-space"><div class="section-heading"><div><div class="eyebrow">RUANG KERJAMU</div><h1>Halo, {{ auth()->user()->name }}.</h1><p class="text-secondary">Kelola peluang dan langkah berikutnya dari sini.</p></div><a class="btn btn-outline-primary" href="{{ route('onboarding') }}">Tambah peran</a></div>
+<div class="container section-space"><div class="section-heading"><div><div class="eyebrow">RUANG KERJAMU</div><h1>Halo, {{ auth()->user()->name }}.</h1><p class="text-secondary">Kelola peluang dan langkah berikutnya dari sini.</p></div><a class="btn btn-outline-primary" href="{{ route('onboarding') }}">Ganti peran</a></div>
 @can('recruiter')
 <a class="text-link d-inline-block mb-3" href="{{ route('profile.edit') }}">Edit profil pribadi →</a>
 <div class="row g-3 mb-4"><div class="col-md-4"><div class="stat-card"><span>Kredit tersedia</span><strong>{{ auth()->user()->availableCredits() }}</strong><small>{{ auth()->user()->reserved_credits }} kredit direservasi / ditahan</small></div></div><div class="col-md-4"><div class="stat-card"><span>Job views</span><strong>{{ $metrics['view'] ?? 0 }}</strong><small>Estimasi interaksi halaman</small></div></div><div class="col-md-4"><div class="stat-card"><span>External apply clicks</span><strong>{{ $metrics['apply'] ?? 0 }}</strong><small>Bukan jumlah lamaran selesai</small></div></div></div>

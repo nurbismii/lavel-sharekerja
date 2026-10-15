@@ -11,4 +11,5 @@ return [
     'categories' => ['Teknologi', 'Marketing', 'Desain', 'Keuangan', 'Operasional', 'Human Resources', 'Sales', 'Customer Service'],
     'employment_types' => ['Full-time', 'Part-time', 'Kontrak', 'Magang', 'Freelance'],
     'levels' => ['Entry Level', 'Junior', 'Senior', 'Manager'],
+    'education_levels' => ['SD', 'SMP', 'SMA', 'SMK', 'D1', 'D2', 'D3', 'D4', 'S1', 'S2', 'S3'],
 ];

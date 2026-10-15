@@ -14,7 +14,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->appendToGroup('web', EnsureActiveAccount::class);
-        $middleware->validateCsrfTokens(except: ['webhooks/xendit']);
+        $middleware->validateCsrfTokens(except: ['webhooks/midtrans']);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

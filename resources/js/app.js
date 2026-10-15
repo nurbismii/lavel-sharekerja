@@ -1,3 +1,6 @@
+import './city-search.js';
+import './job-regions.js';
+
 const notify = (message) => { const box = document.querySelector('#feedback'); if (!box) return; box.textContent = message; box.hidden = false; setTimeout(() => { box.hidden = true; }, 5000); };
 const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
 document.querySelectorAll('[data-share]').forEach(button => button.addEventListener('click', async () => {

@@ -15,8 +15,8 @@ use App\Models\Purchase;
 use App\Models\Role;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Services\MidtransPayments;
 use App\Services\PublicationService;
-use App\Services\XenditPayments;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
@@ -117,20 +117,22 @@ class PlatformTest extends TestCase
         $this->get('/dashboard')->assertForbidden();
     }
 
-    public function test_xendit_webhook_rechecks_provider_and_grants_only_once(): void
+    public function test_midtrans_webhook_rechecks_provider_and_grants_only_once(): void
     {
-        config(['services.xendit.secret_key' => 'test-key', 'services.xendit.webhook_token' => 'test-token']);
+        config(['services.midtrans.server_key' => 'test-key', 'services.midtrans.merchant_id' => 'test-merchant', 'services.midtrans.is_production' => false]);
         $user = $this->account(Role::RECRUITER);
         $package = Package::create(['name' => 'Test', 'price' => 100000, 'credits' => 3]);
-        $purchase = Purchase::create(['reference' => (string) Str::uuid(), 'user_id' => $user->id, 'package_id' => $package->id, 'package_name' => 'Test', 'amount' => 100000, 'credits' => 3, 'provider_id' => 'invoice-test']);
-        Http::fake(['api.xendit.co/*' => Http::response(['id' => 'invoice-test', 'external_id' => $purchase->reference, 'currency' => 'IDR', 'amount' => 100000, 'status' => 'PAID'])]);
-        $body = ['external_id' => $purchase->reference, 'id' => 'invoice-test'];
-        $this->postJson(route('xendit.webhook'), $body)->assertUnauthorized();
-        $this->postJson(route('xendit.webhook'), $body, ['x-callback-token' => 'test-token'])->assertOk();
-        $this->postJson(route('xendit.webhook'), $body, ['x-callback-token' => 'test-token'])->assertOk();
+        $purchase = Purchase::create(['reference' => (string) Str::uuid(), 'user_id' => $user->id, 'package_id' => $package->id, 'package_name' => 'Test', 'amount' => 100000, 'credits' => 3, 'provider' => 'midtrans', 'provider_id' => 'invoice-test']);
+        $invoice = ['transaction_id' => 'invoice-test', 'order_id' => $purchase->reference, 'currency' => 'IDR', 'gross_amount' => '100000.00', 'transaction_status' => 'settlement', 'status_code' => '200', 'merchant_id' => 'test-merchant'];
+        Http::fake(['api.sandbox.midtrans.com/*' => Http::response($invoice)]);
+        $body = ['order_id' => $purchase->reference, 'status_code' => '200', 'gross_amount' => '100000.00', 'signature_key' => str_repeat('0', 128)];
+        $this->postJson(route('midtrans.webhook'), $body)->assertUnauthorized();
+        $body['signature_key'] = hash('sha512', $purchase->reference.'200100000.00test-key');
+        $this->postJson(route('midtrans.webhook'), $body)->assertOk();
+        $this->postJson(route('midtrans.webhook'), $body)->assertOk();
         $this->assertSame(3, $user->fresh()->credits);
         $this->assertSame(1, CreditEntry::count());
-        app(XenditPayments::class)->apply($purchase, ['id' => 'invoice-test', 'external_id' => $purchase->reference, 'currency' => 'IDR', 'amount' => 100000, 'status' => 'EXPIRED']);
+        app(MidtransPayments::class)->apply($purchase, array_replace($invoice, ['transaction_status' => 'expire']));
         $this->assertSame('PAID', $purchase->fresh()->status);
     }
 
@@ -204,12 +206,13 @@ class PlatformTest extends TestCase
 
     public function test_refund_hold_prevents_credit_spend_and_completion_is_idempotent(): void
     {
+        config(['services.midtrans.merchant_id' => 'test-merchant']);
         $user = $this->account(Role::RECRUITER);
         $company = Company::factory()->create(['owner_user_id' => $user->id]);
         $job = JobPosting::factory()->create(['company_id' => $company->id]);
         $package = Package::create(['name' => 'Test', 'price' => 100000, 'credits' => 1]);
-        $purchase = Purchase::create(['reference' => (string) Str::uuid(), 'user_id' => $user->id, 'package_id' => $package->id, 'package_name' => 'Test', 'amount' => 100000, 'credits' => 1]);
-        app(XenditPayments::class)->apply($purchase, ['id' => 'invoice-refund', 'external_id' => $purchase->reference, 'currency' => 'IDR', 'amount' => 100000, 'status' => 'PAID']);
+        $purchase = Purchase::create(['reference' => (string) Str::uuid(), 'user_id' => $user->id, 'package_id' => $package->id, 'package_name' => 'Test', 'amount' => 100000, 'credits' => 1, 'provider' => 'midtrans']);
+        app(MidtransPayments::class)->apply($purchase, ['transaction_id' => 'invoice-refund', 'order_id' => $purchase->reference, 'currency' => 'IDR', 'gross_amount' => '100000.00', 'transaction_status' => 'settlement', 'status_code' => '200', 'merchant_id' => 'test-merchant']);
         $admin = $this->account(Role::ADMIN);
         $this->actingAs($admin)->post(route('admin.refund', $purchase), ['action' => 'hold', 'reason' => 'Permintaan refund'])->assertSessionHasNoErrors();
         $this->actingAs($user)->post(route('recruiter.jobs.status', $job), ['action' => 'submit'])->assertSessionHasErrors('job');
@@ -220,16 +223,20 @@ class PlatformTest extends TestCase
         $this->assertSame(1, CreditEntry::where('type', 'REFUND')->count());
     }
 
-    public function test_provider_invoice_recovery_restores_checkout_and_rejects_wrong_amount(): void
+    public function test_midtrans_checkout_is_created_and_wrong_amount_is_rejected(): void
     {
+        config(['services.midtrans.server_key' => 'test-key', 'services.midtrans.merchant_id' => 'test-merchant', 'services.midtrans.is_production' => false]);
         $user = $this->account(Role::RECRUITER);
         $package = Package::create(['name' => 'Test', 'price' => 100000, 'credits' => 1]);
-        $purchase = Purchase::create(['reference' => (string) Str::uuid(), 'user_id' => $user->id, 'package_id' => $package->id, 'package_name' => 'Test', 'amount' => 100000, 'credits' => 1]);
-        app(XenditPayments::class)->apply($purchase, ['id' => 'invoice-recover', 'external_id' => $purchase->reference, 'currency' => 'IDR', 'amount' => 100000, 'status' => 'PENDING', 'invoice_url' => 'https://checkout.xendit.co/web/test']);
-        $this->assertSame('https://checkout.xendit.co/web/test', $purchase->fresh()->checkout_url);
-        config(['services.xendit.secret_key' => 'test-key', 'services.xendit.webhook_token' => 'test-token']);
-        Http::fake(['api.xendit.co/*' => Http::response(['id' => 'invoice-recover', 'external_id' => $purchase->reference, 'currency' => 'IDR', 'amount' => 1, 'status' => 'PAID'])]);
-        $this->postJson(route('xendit.webhook'), ['external_id' => $purchase->reference, 'id' => 'invoice-recover'], ['x-callback-token' => 'test-token'])->assertUnprocessable();
+        $purchase = Purchase::create(['reference' => (string) Str::uuid(), 'user_id' => $user->id, 'package_id' => $package->id, 'package_name' => 'Test', 'amount' => 100000, 'credits' => 1, 'provider' => 'midtrans']);
+        Http::fake([
+            'app.sandbox.midtrans.com/*' => Http::response(['redirect_url' => 'https://app.sandbox.midtrans.com/snap/v2/vtweb/test']),
+            'api.sandbox.midtrans.com/*' => Http::response(['transaction_id' => 'invoice-recover', 'order_id' => $purchase->reference, 'currency' => 'IDR', 'gross_amount' => '1.00', 'transaction_status' => 'settlement', 'status_code' => '200', 'merchant_id' => 'test-merchant']),
+        ]);
+        app(MidtransPayments::class)->invoice($purchase);
+        $this->assertSame('https://app.sandbox.midtrans.com/snap/v2/vtweb/test', $purchase->fresh()->checkout_url);
+        $body = ['order_id' => $purchase->reference, 'status_code' => '200', 'gross_amount' => '100000.00', 'signature_key' => hash('sha512', $purchase->reference.'200100000.00test-key')];
+        $this->postJson(route('midtrans.webhook'), $body)->assertUnprocessable();
         $this->assertSame(0, $user->fresh()->credits);
     }
 

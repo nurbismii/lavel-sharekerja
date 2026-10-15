@@ -3,6 +3,7 @@
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\ApplicationController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CityController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\JobController;
 use App\Http\Controllers\ProfileController;
@@ -17,6 +18,8 @@ use Illuminate\Support\Facades\Storage;
 
 Route::get('/', [JobController::class, 'index'])->name('home');
 Route::get('/jobs', [JobController::class, 'index'])->name('jobs.index');
+Route::get('/locations/cities', CityController::class)->middleware('throttle:60,1')->name('locations.cities');
+Route::get('/locations/regions', [CityController::class, 'regions'])->middleware('throttle:60,1')->name('locations.regions');
 Route::get('/jobs/{job}', [JobController::class, 'show'])->name('jobs.show');
 Route::get('/jobs/{job}/apply', [JobController::class, 'external'])->middleware('throttle:30,1')->name('jobs.external');
 Route::post('/jobs/{job}/share', [JobController::class, 'share'])->middleware('throttle:30,1')->name('jobs.share');
@@ -32,7 +35,7 @@ Route::get('/auth/google', [AuthController::class, 'redirect'])->middleware('thr
 Route::get('/auth/google/callback', [AuthController::class, 'callback'])->middleware('throttle:20,1')->name('auth.callback');
 Route::get('/unsubscribe/{token}', [SubscriptionController::class, 'unsubscribe'])->name('unsubscribe');
 Route::post('/unsubscribe/{token}', [SubscriptionController::class, 'stop'])->middleware('throttle:10,1')->name('unsubscribe.stop');
-Route::post('/webhooks/xendit', [PurchaseController::class, 'webhook'])->name('xendit.webhook');
+Route::post('/webhooks/midtrans', [PurchaseController::class, 'webhook'])->name('midtrans.webhook');
 Route::get('/sitemap.xml', function () {
     return response()->view('sitemap', ['jobs' => JobPosting::live()->select('slug', 'updated_at')->limit(10000)->get()])->header('Content-Type', 'application/xml');
 })->name('sitemap');

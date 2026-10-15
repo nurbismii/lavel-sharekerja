@@ -121,7 +121,7 @@ class AdminController extends Controller
             $this->audit($request, 'refund.'.$data['action'], 'purchase:'.$purchase->id, $data['reason']);
         });
 
-        return back()->with('success', 'Pencatatan refund diperbarui. Pengembalian dana dilakukan dan diverifikasi melalui Xendit.');
+        return back()->with('success', 'Pencatatan refund diperbarui. Pengembalian dana dilakukan dan diverifikasi melalui Midtrans.');
     }
 
     private function audit(Request $request, string $action, string $subject, string $reason): void

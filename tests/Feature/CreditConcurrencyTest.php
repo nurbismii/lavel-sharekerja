@@ -6,6 +6,7 @@ use App\Models\Company;
 use App\Models\JobPosting;
 use App\Models\Role;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabaseState;
 use Illuminate\Support\Facades\Artisan;
 use Tests\TestCase;
 
@@ -17,10 +18,11 @@ class CreditConcurrencyTest extends TestCase
             $this->markTestSkipped('Requires a dedicated MySQL/MariaDB testing database.');
         }
         $database = config('database.connections.'.config('database.default').'.database');
-        if ($database !== 'sharekerja_concurrency_testing') {
-            $this->markTestSkipped('Run only against sharekerja_concurrency_testing; migrate:fresh must never touch another database.');
+        if (! preg_match('/\Asharekerja_concurrency_testing(?:_[0-9]{14})?\z/', $database)) {
+            $this->markTestSkipped('Run only against sharekerja_concurrency_testing or its timestamped test databases; migrate:fresh must never touch another database.');
         }
         Artisan::call('migrate:fresh', ['--force' => true]);
+        RefreshDatabaseState::$migrated = false;
         $owner = User::factory()->create(['credits' => 1]);
         $owner->roles()->attach(Role::firstOrCreate(['name' => Role::RECRUITER]));
         $company = Company::factory()->create(['owner_user_id' => $owner->id]);
