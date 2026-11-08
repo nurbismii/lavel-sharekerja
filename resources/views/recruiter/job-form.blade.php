@@ -1,9 +1,11 @@
-@extends('layouts.app')
-@section('content')
+@extends('layouts.workspace')
+@section('title', ($job->exists ? 'Edit lowongan' : 'Buat lowongan').' — Sharekerjaid')
+@section('workspace-content')
 <div class="container section-space narrow"><a href="{{ route('dashboard') }}" class="text-link">← Dashboard</a><div class="section-heading mt-3"><div><div class="eyebrow">JANGKAU TALENTA BARU</div><h1>{{ $job->exists ? 'Edit draft lowongan' : 'Buat lowongan' }}</h1></div>@if($job->exists)<x-status :value="$job->status" />@endif</div>
 @if($job->review_reason)<div class="alert alert-info">{{ $job->review_reason }}</div>@endif
 <form action="{{ $job->exists ? route('recruiter.jobs.update',$job) : route('recruiter.jobs.store') }}" method="post" class="panel" data-wizard>@csrf @if($job->exists)@method('PUT')@endif
-<div class="wizard-progress mb-4" aria-live="polite">Lengkapi informasi lowongan</div>
+<div class="wizard-progress mb-2" aria-live="polite">Lengkapi informasi lowongan</div>
+<progress class="wizard-meter mb-4" data-wizard-meter max="7" value="1" aria-label="Kemajuan pengisian lowongan" hidden>1 dari 7 langkah</progress>
 <button type="submit" formnovalidate class="btn btn-sm btn-outline-primary mb-4">Simpan draft sementara</button>
 <fieldset data-step><legend>1. Informasi dasar</legend><x-field name="title" label="Judul posisi" :value="$job->title" required maxlength="150" /><div class="row"><div class="col-md-6"><x-field name="category" label="Kategori" :value="$job->category" :options="array_combine(config('sharekerja.categories'),config('sharekerja.categories'))" required /></div><div class="col-md-6"><x-field name="employment_type" label="Tipe pekerjaan" :value="$job->employment_type" :options="array_combine(config('sharekerja.employment_types'),config('sharekerja.employment_types'))" required /></div><div class="col-md-6"><x-field name="level" label="Level" :value="$job->level" :options="array_combine(config('sharekerja.levels'),config('sharekerja.levels'))" required /></div><div class="col-md-6"><x-field name="vacancies" label="Jumlah kebutuhan" type="number" :value="$job->vacancies ?? 1" min="1" required /></div></div></fieldset>
 <fieldset data-step data-job-regions data-url="{{ route('locations.regions') }}">

@@ -10,10 +10,13 @@ document.querySelectorAll('[data-share]').forEach(button => button.addEventListe
 document.querySelectorAll('[data-wizard]').forEach(form => {
     const steps = [...form.querySelectorAll('[data-step]')]; let current = 0;
     const previous=form.querySelector('[data-previous]'), next=form.querySelector('[data-next]');
+    const meter=form.querySelector('[data-wizard-meter]');
     form.querySelector('.wizard-controls').hidden = false;
+    if(meter){meter.hidden=false;meter.max=steps.length;}
     const render = () => {
         steps.forEach((step,index)=>{step.hidden=index!==current;});
         form.querySelector('.wizard-progress').textContent = 'Langkah '+(current+1)+' dari '+steps.length;
+        if(meter){meter.value=current+1;meter.textContent=(current+1)+' dari '+steps.length+' langkah';}
         previous.disabled=current===0; next.hidden=current===steps.length-1;
         const preview=form.querySelector('[data-preview]'); preview.replaceChildren();
         for(const [key,label] of Object.entries({title:'Posisi',location:'Lokasi',method:'Metode',deadline:'Deadline'})) { const dt=document.createElement('dt'), dd=document.createElement('dd'); dt.textContent=label; dd.textContent=form.elements[key].value || 'Belum diisi'; preview.append(dt,dd); }

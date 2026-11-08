@@ -20,9 +20,14 @@ use Illuminate\View\View;
 
 class AdminController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
-        return view('admin.index', ['subscribers' => Subscription::with('user')->latest()->paginate(15, ['*'], 'subscribers_page'), 'received' => Purchase::where('status', 'PAID')->sum('amount'), 'refunded' => Purchase::where('refund_status', 'SUCCEEDED')->sum('amount'), 'heartbeat' => Cache::get('platform:heartbeat'), 'backlog' => DB::table('jobs')->count(), 'companies' => Company::with('owner')->where('verification_status', 'PENDING')->paginate(10, ['*'], 'companies_page'), 'jobs' => JobPosting::with('company')->whereIn('status', [JobPosting::PENDING, JobPosting::PUBLISHED, JobPosting::SUSPENDED])->latest()->paginate(15, ['*'], 'jobs_page'), 'reports' => JobReport::whereIn('status', ['OPEN', 'IN_REVIEW'])->latest()->paginate(10, ['*'], 'reports_page'), 'packages' => Package::orderBy('price')->get(), 'purchases' => Purchase::with('user')->latest()->paginate(15, ['*'], 'purchases_page'), 'users' => User::with('roles')->latest()->paginate(15, ['*'], 'users_page'), 'logs' => DB::table('audit_logs')->latest('id')->paginate(20, ['*'], 'logs_page'), 'mailStats' => EmailDelivery::selectRaw('status, COUNT(*) as total')->groupBy('status')->pluck('total', 'status')]);
+        $section = match ($request->query('section')) {
+            'moderation', 'packages', 'transactions', 'users', 'reports', 'subscribers', 'audit' => $request->query('section'),
+            default => 'verification',
+        };
+
+        return view('admin.index', ['section' => $section, 'subscribers' => Subscription::with('user')->latest()->paginate(15, ['*'], 'subscribers_page'), 'received' => Purchase::where('status', 'PAID')->sum('amount'), 'refunded' => Purchase::where('refund_status', 'SUCCEEDED')->sum('amount'), 'heartbeat' => Cache::get('platform:heartbeat'), 'backlog' => DB::table('jobs')->count(), 'companies' => Company::with('owner')->where('verification_status', 'PENDING')->paginate(10, ['*'], 'companies_page'), 'jobs' => JobPosting::with('company')->whereIn('status', [JobPosting::PENDING, JobPosting::PUBLISHED, JobPosting::SUSPENDED])->latest()->paginate(15, ['*'], 'jobs_page'), 'reports' => JobReport::whereIn('status', ['OPEN', 'IN_REVIEW'])->latest()->paginate(10, ['*'], 'reports_page'), 'packages' => Package::orderBy('price')->get(), 'purchases' => Purchase::with('user')->latest()->paginate(15, ['*'], 'purchases_page'), 'users' => User::with('roles')->latest()->paginate(15, ['*'], 'users_page'), 'logs' => DB::table('audit_logs')->latest('id')->paginate(20, ['*'], 'logs_page'), 'mailStats' => EmailDelivery::selectRaw('status, COUNT(*) as total')->groupBy('status')->pluck('total', 'status')]);
     }
 
     public function verify(Request $request, Company $company): RedirectResponse
