@@ -54,7 +54,8 @@ class JobPosting extends Model
 
     public function scopeLive(Builder $query): Builder
     {
-        return $query->where('status', self::PUBLISHED)->where('deadline', '>', now())->where('expires_at', '>', now())->whereHas('company', fn (Builder $q) => $q->where('status', 'ACTIVE')->where('verification_status', 'VERIFIED')->whereHas('owner', fn (Builder $u) => $u->where('status', 'ACTIVE')));
+        return $query->where('status', self::PUBLISHED)->where('deadline', '>', now())->where('expires_at', '>', now())
+            ->whereHas('company', fn (Builder $company) => $company->publishable());
     }
 
     public function isLive(): bool
@@ -71,6 +72,10 @@ class JobPosting extends Model
         $data = ['@context' => 'https://schema.org', '@type' => 'JobPosting', 'title' => $this->title, 'description' => $description, 'datePosted' => $this->published_at->toIso8601String(), 'validThrough' => $this->deadline->min($this->expires_at)->toIso8601String(), 'hiringOrganization' => ['@type' => 'Organization', 'name' => $this->company->name], 'url' => route('jobs.show', $this), 'employmentType' => match ($this->employment_type) {
             'Full-time' => 'FULL_TIME','Part-time' => 'PART_TIME','Kontrak','Freelance' => 'CONTRACTOR','Magang' => 'INTERN',default => 'OTHER'
         }];
+        $data['directApply'] = $this->method === self::INTERNAL;
+        if ($this->company->logo_path) {
+            $data['hiringOrganization']['logo'] = route('companies.logo', $this->company->slug);
+        }
         if ($this->work_arrangement === 'REMOTE') {
             $data['jobLocationType'] = 'TELECOMMUTE';
             $data['applicantLocationRequirements'] = ['@type' => 'AdministrativeArea', 'name' => $this->location, 'containedInPlace' => ['@type' => 'Country', 'name' => $this->country_code]];

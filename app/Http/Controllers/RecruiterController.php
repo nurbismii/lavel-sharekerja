@@ -70,6 +70,17 @@ class RecruiterController extends Controller
         return view('recruiter.job-form', ['job' => new JobPosting]);
     }
 
+    public function copy(JobPosting $job): View
+    {
+        Gate::authorize('manage-job', $job);
+        abort_unless(in_array($job->status, [JobPosting::CLOSED, JobPosting::EXPIRED], true), 404);
+
+        $draft = new JobPosting($job->only(array_keys(JobPostingRequest::publicationRules())));
+        $draft->deadline = null;
+
+        return view('recruiter.job-form', ['job' => $draft, 'isCopy' => true]);
+    }
+
     public function edit(JobPosting $job): View
     {
         Gate::authorize('manage-job', $job);

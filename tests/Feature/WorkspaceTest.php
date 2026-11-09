@@ -105,9 +105,33 @@ class WorkspaceTest extends TestCase
         }
 
         $this->get(route('recruiter.candidates', $job))->assertOk()->assertSee($candidate->name)
-            ->assertSee('value="REVIEWED"', false)->assertSee('value="SHORTLISTED"', false)
-            ->assertDontSee('value="HIRED"', false);
+            ->assertSee('value="REVIEWED">', false)->assertSee('value="SHORTLISTED">', false)
+            ->assertDontSee('value="HIRED">', false);
         $this->actingAs($this->account(Role::RECRUITER))->get(route('recruiter.candidates', $job))->assertForbidden();
+    }
+
+    public function test_recruiter_can_filter_new_applications_and_view_portfolios(): void
+    {
+        $recruiter = $this->account(Role::RECRUITER);
+        $company = Company::factory()->create(['owner_user_id' => $recruiter->id]);
+        $job = JobPosting::factory()->published()->create(['company_id' => $company->id, 'method' => 'INTERNAL']);
+        foreach (['Dara_Safitri' => 'NEW', 'DaraXPutri' => 'NEW', 'Dara_Aulia' => 'REVIEWED'] as $name => $status) {
+            $seeker = $this->account(Role::SEEKER);
+            $job->applications()->create([
+                'user_id' => $seeker->id, 'name' => $name, 'email' => $seeker->email, 'phone' => '081234567890',
+                'cv_path' => 'cvs/test.pdf', 'status' => $status, 'portfolio' => 'https://example.com/'.$name,
+            ]);
+        }
+
+        $this->actingAs($recruiter)->get(route('dashboard'))->assertOk()->assertSee('2 lamaran baru')
+            ->assertSee(route('recruiter.candidates', ['job' => $job, 'status' => 'NEW']));
+        $this->get(route('recruiter.candidates', ['job' => $job, 'q' => 'dara_', 'status' => 'NEW']))
+            ->assertOk()->assertSee('Dara_Safitri')->assertSee('href="https://example.com/Dara_Safitri"', false)
+            ->assertDontSee('DaraXPutri')->assertDontSee('Dara_Aulia');
+        $this->get(route('recruiter.candidates', ['job' => $job, 'status' => 'HIRED']))
+            ->assertOk()->assertSee('Kandidat tidak ditemukan');
+        $this->get(route('recruiter.candidates', ['job' => $job, 'status' => 'INVALID']))
+            ->assertSessionHasErrors('status');
     }
 
     public function test_seeker_dashboard_retains_its_own_navigation(): void

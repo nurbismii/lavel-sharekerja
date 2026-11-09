@@ -3,6 +3,9 @@
 @section('workspace-content')
 <div class="container section-space narrow"><a href="{{ route('dashboard') }}" class="text-link">← Dashboard</a><div class="section-heading mt-3"><div><div class="eyebrow">JANGKAU TALENTA BARU</div><h1>{{ $job->exists ? 'Edit draft lowongan' : 'Buat lowongan' }}</h1></div>@if($job->exists)<x-status :value="$job->status" />@endif</div>
 @if($job->review_reason)<div class="alert alert-info">{{ $job->review_reason }}</div>@endif
+@if($isCopy ?? false)
+<div class="alert alert-info">Detail lowongan sebelumnya sudah disalin. Tinjau isian dan pilih tenggat baru sebelum mengajukan publikasi.</div>
+@endif
 <form action="{{ $job->exists ? route('recruiter.jobs.update',$job) : route('recruiter.jobs.store') }}" method="post" class="panel" data-wizard>@csrf @if($job->exists)@method('PUT')@endif
 <div class="wizard-progress mb-2" aria-live="polite">Lengkapi informasi lowongan</div>
 <progress class="wizard-meter mb-4" data-wizard-meter max="7" value="1" aria-label="Kemajuan pengisian lowongan" hidden>1 dari 7 langkah</progress>

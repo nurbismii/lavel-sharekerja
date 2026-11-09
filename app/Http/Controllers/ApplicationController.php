@@ -10,14 +10,18 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ApplicationController extends Controller
 {
-    public function create(JobPosting $job): View
+    public function create(Request $request, JobPosting $job): View|RedirectResponse
     {
         abort_unless($job->isLive() && $job->method === JobPosting::INTERNAL, 404);
+        if ($job->applications()->where('user_id', $request->user()->id)->exists()) {
+            return to_route('dashboard')->withFragment('lamaran');
+        }
 
         return view('applications.create', compact('job'));
     }
@@ -49,11 +53,31 @@ class ApplicationController extends Controller
         return to_route('dashboard')->with('success', 'Lamaran terkirim. Pantau statusnya di dashboard.');
     }
 
-    public function candidates(JobPosting $job): View
+    public function candidates(Request $request, JobPosting $job): View
     {
         Gate::authorize('manage-job', $job);
 
-        return view('applications.candidates', ['job' => $job, 'applications' => $job->applications()->latest()->paginate(20)]);
+        $statuses = ['NEW' => 'Baru', 'REVIEWED' => 'Ditinjau', 'SHORTLISTED' => 'Kandidat pilihan', 'HIRED' => 'Diterima', 'REJECTED' => 'Ditolak'];
+        $filters = $request->validate([
+            'q' => 'nullable|string|max:150',
+            'status' => ['nullable', Rule::in(array_keys($statuses))],
+        ]);
+
+        $query = $job->applications();
+        if (isset($filters['q'])) {
+            $name = strtr($filters['q'], ['!' => '!!', '%' => '!%', '_' => '!_']);
+            $query->whereRaw("name LIKE ? ESCAPE '!'", ['%'.$name.'%']);
+        }
+        if (isset($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+
+        return view('applications.candidates', [
+            'job' => $job,
+            'applications' => $query->latest()->orderByDesc('id')->paginate(20)->appends($filters),
+            'statuses' => $statuses,
+            'filters' => $filters,
+        ]);
     }
 
     public function status(Request $request, JobApplication $application): RedirectResponse

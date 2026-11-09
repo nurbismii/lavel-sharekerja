@@ -19,7 +19,36 @@
 <div class="workspace-panel-heading"><div><h2>Lowongan perusahaan</h2><p>Kelola draft, pantau publikasi, dan tinjau kandidat.</p></div><span class="count-badge">{{ $jobs?->total() ?? 0 }} lowongan</span></div>
 @if($jobs?->isNotEmpty())
 <div class="table-responsive"><table class="table align-middle workspace-table"><thead><tr><th scope="col">Posisi</th><th scope="col">Status</th><th scope="col">Kandidat</th><th scope="col">Tindakan</th></tr></thead><tbody>
-@foreach($jobs as $job)<tr><td><strong>{{ $job->title }}</strong><div class="small text-secondary">{{ $job->location ?? 'Lokasi belum diisi' }} · {{ $job->method === 'INTERNAL' ? 'Lamaran internal' : 'Lamaran eksternal' }}</div>@if($job->review_reason)<div class="review-note">{{ $job->review_reason }}</div>@endif</td><td><x-status :value="$job->status" /></td><td>@if($job->method === 'INTERNAL')<a class="candidate-link" href="{{ route('recruiter.candidates',$job) }}">{{ $job->applications_count }} kandidat <span aria-hidden="true">↗</span></a>@else<span class="small text-secondary">Website perusahaan</span>@endif</td><td><div class="table-actions">@if(in_array($job->status,['DRAFT','REJECTED']))<a class="btn btn-sm btn-outline-primary" href="{{ route('recruiter.jobs.edit',$job) }}">Edit / ajukan</a>@elseif($job->status === 'WAITING_APPROVAL')<form method="post" action="{{ route('recruiter.jobs.status',$job) }}">@csrf<input type="hidden" name="action" value="withdraw"><button class="btn btn-sm btn-outline-primary">Tarik pengajuan</button></form>@elseif($job->status === 'PUBLISHED')<a class="btn btn-sm btn-outline-primary" href="{{ route('jobs.show',$job) }}">Lihat lowongan ↗</a><form method="post" action="{{ route('recruiter.jobs.status',$job) }}">@csrf<input type="hidden" name="action" value="close"><button class="btn btn-sm btn-outline-danger">Tutup lowongan</button></form>@else<span class="small text-secondary">{{ $job->status === 'SUSPENDED' ? 'Hubungi admin untuk peninjauan' : 'Publikasi telah selesai' }}</span>@endif</div></td></tr>@endforeach
+@foreach($jobs as $job)
+<tr>
+    <td><strong>{{ $job->title }}</strong><div class="small text-secondary">{{ $job->location ?? 'Lokasi belum diisi' }} · {{ $job->method === 'INTERNAL' ? 'Lamaran internal' : 'Lamaran eksternal' }}</div>@if($job->review_reason)<div class="review-note">{{ $job->review_reason }}</div>@endif</td>
+    <td><x-status :value="$job->status" /></td>
+    <td>
+        @if($job->method === 'INTERNAL')
+            <a class="candidate-link" href="{{ route('recruiter.candidates', $job) }}">{{ $job->applications_count }} kandidat <span aria-hidden="true">↗</span></a>
+            @if($job->new_applications_count)
+                <a class="status-pill status-info d-table mt-1" href="{{ route('recruiter.candidates', ['job' => $job, 'status' => 'NEW']) }}">{{ $job->new_applications_count }} lamaran baru</a>
+            @endif
+        @else
+            <span class="small text-secondary">Website perusahaan</span>
+        @endif
+    </td>
+    <td><div class="table-actions">
+        @if(in_array($job->status, ['DRAFT', 'REJECTED']))
+            <a class="btn btn-sm btn-outline-primary" href="{{ route('recruiter.jobs.edit', $job) }}">Edit / ajukan</a>
+        @elseif($job->status === 'WAITING_APPROVAL')
+            <form method="post" action="{{ route('recruiter.jobs.status', $job) }}">@csrf<input type="hidden" name="action" value="withdraw"><button class="btn btn-sm btn-outline-primary">Tarik pengajuan</button></form>
+        @elseif($job->status === 'PUBLISHED')
+            <a class="btn btn-sm btn-outline-primary" href="{{ route('jobs.show', $job) }}">Lihat lowongan ↗</a>
+            <form method="post" action="{{ route('recruiter.jobs.status', $job) }}">@csrf<input type="hidden" name="action" value="close"><button class="btn btn-sm btn-outline-danger">Tutup lowongan</button></form>
+        @elseif(in_array($job->status, ['CLOSED', 'EXPIRED']))
+            <a class="btn btn-sm btn-outline-primary" href="{{ route('recruiter.jobs.copy', $job) }}">Salin sebagai draft</a>
+        @else
+            <span class="small text-secondary">{{ $job->status === 'SUSPENDED' ? 'Hubungi admin untuk peninjauan' : 'Publikasi telah selesai' }}</span>
+        @endif
+    </div></td>
+</tr>
+@endforeach
 </tbody></table></div>
 @else
 <div class="workspace-empty"><span class="empty-icon"><x-workspace-icon name="briefcase" /></span><h3>Siap membuka peluang baru?</h3><p>Buat draft lowongan pertama. Kredit baru direservasi saat diajukan untuk review.</p><a class="btn btn-primary" href="{{ $company ? route('recruiter.jobs.create') : route('recruiter.company') }}">{{ $company ? '+ Buat lowongan pertama' : 'Lengkapi profil perusahaan' }}</a></div>
@@ -38,7 +67,7 @@
 @endcan
 @can('seeker')<a class="text-link d-inline-block mb-3" href="{{ route('profile.edit') }}">Edit profil pribadi →</a>
 <div class="d-flex gap-2 mb-4"><a href="{{ route('jobs.index') }}" class="btn btn-primary">Cari lowongan →</a><a href="{{ route('subscription.edit') }}" class="btn btn-outline-primary">Preferensi email</a></div>
-<section class="panel mb-4"><h2 class="h4">Lamaran saya</h2><div class="table-responsive"><table class="table"><thead><tr><th>Posisi</th><th>Perusahaan</th><th>Status</th><th>Dokumen</th></tr></thead><tbody>@forelse($applications as $application)<tr><td>{{ $application->job->title }}</td><td>{{ $application->job->company->name }}</td><td><x-status :value="$application->status" /><div class="small text-secondary">{{ $application->updated_at->format('d M Y') }}</div></td><td><a href="{{ route('applications.cv',$application) }}">CV terkirim</a></td></tr>@empty<tr><td colspan="4" class="py-4 text-secondary">Belum ada lamaran internal. Klik external apply tidak masuk daftar ini.</td></tr>@endforelse</tbody></table></div>{{ $applications->links() }}</section>
+<section id="lamaran" class="panel mb-4"><h2 class="h4">Lamaran saya</h2><div class="table-responsive"><table class="table"><thead><tr><th>Posisi</th><th>Perusahaan</th><th>Status</th><th>Dokumen</th></tr></thead><tbody>@forelse($applications as $application)<tr><td>{{ $application->job->title }}</td><td>{{ $application->job->company->name }}</td><td><x-status :value="$application->status" /><div class="small text-secondary">{{ $application->updated_at->format('d M Y') }}</div></td><td><a href="{{ route('applications.cv',$application) }}">CV terkirim</a></td></tr>@empty<tr><td colspan="4" class="py-4 text-secondary">Belum ada lamaran internal. Klik external apply tidak masuk daftar ini.</td></tr>@endforelse</tbody></table></div>{{ $applications->fragment('lamaran')->links() }}</section>
 <h2 class="h4 mb-3">Lowongan tersimpan</h2><div class="row g-4">@forelse($saved as $job)<div class="col-md-6 col-lg-4"><div class="panel"><h3 class="h5">{{ $job->title }}</h3><p>{{ $job->company->name }}</p>@if($job->isLive())<a href="{{ route('jobs.show',$job) }}" class="text-link">Lihat lowongan →</a>@else<span class="status-pill">Tidak tersedia / sudah ditutup</span>@endif<form method="post" action="{{ route('jobs.save',$job) }}" class="mt-3">@csrf<button class="btn btn-sm btn-light">Hapus simpanan</button></form></div></div>@empty<p class="text-secondary">Simpan lowongan yang menarik untuk dilihat kembali.</p>@endforelse</div><div class="mt-4">{{ $saved->links() }}</div>
 @endcan
 </div>

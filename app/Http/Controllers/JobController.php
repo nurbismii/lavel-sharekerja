@@ -38,22 +38,47 @@ class JobController extends Controller
             $query->where('salary_visible', true)->where('salary_min', '>=', $filters['salary']);
         }
 
-        return view('jobs.index', ['jobs' => $query->latest('published_at')->paginate(20)->withQueryString(), 'isHome' => $request->routeIs('home'), 'companies' => $request->routeIs('home') ? Company::where('status', 'ACTIVE')->where('verification_status', 'VERIFIED')->whereHas('owner', fn ($q) => $q->where('status', 'ACTIVE'))->latest()->limit(6)->get() : collect()]);
+        $jobs = $query->latest('published_at')->paginate(20)->withQueryString();
+        $isHome = $request->routeIs('home');
+
+        return view('jobs.index', [
+            'jobs' => $jobs,
+            'isHome' => $isHome,
+            'companies' => $isHome ? Company::publishable()->latest()->limit(6)->get() : collect(),
+            'indexable' => ! array_filter($filters) && $jobs->currentPage() <= $jobs->lastPage(),
+            'canonical' => route($isHome ? 'home' : 'jobs.index', $jobs->currentPage() > 1 ? ['page' => $jobs->currentPage()] : []),
+        ]);
     }
 
     public function show(Request $request, JobPosting $job): View
     {
         abort_unless(in_array($job->status, [JobPosting::PUBLISHED, JobPosting::CLOSED, JobPosting::EXPIRED], true) && $job->company->canPublish(), 404);
         $this->metric($request, $job, 'view');
+        $user = $request->user();
+        $application = $job->method === JobPosting::INTERNAL && $user?->can('seeker')
+            ? $job->applications()->where('user_id', $user->id)->first(['status', 'updated_at'])
+            : null;
 
-        return view('jobs.show', ['job' => $job->load('company'), 'saved' => $request->user() ? DB::table('job_saves')->where('user_id', $request->user()->id)->where('job_posting_id', $job->id)->exists() : false]);
+        return view('jobs.show', [
+            'job' => $job,
+            'application' => $application,
+            'saved' => $user ? DB::table('job_saves')->where('user_id', $user->id)->where('job_posting_id', $job->id)->exists() : false,
+            'indexable' => $job->isLive(),
+            'canonical' => route('jobs.show', $job),
+        ]);
     }
 
     public function company(Company $company): View
     {
         abort_unless($company->canPublish(), 404);
+        $jobs = $company->jobs()->live()->with('company')->latest('published_at')->paginate(20);
 
-        return view('jobs.company', ['company' => $company, 'jobs' => $company->jobs()->live()->with('company')->latest('published_at')->paginate(20)]);
+        return view('jobs.company', [
+            'company' => $company,
+            'jobs' => $jobs,
+            'indexable' => $jobs->currentPage() <= $jobs->lastPage(),
+            'canonical' => route('companies.show', ['company' => $company->slug] + ($jobs->currentPage() > 1 ? ['page' => $jobs->currentPage()] : [])),
+        ]);
     }
 
     public function external(Request $request, JobPosting $job): RedirectResponse

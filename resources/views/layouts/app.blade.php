@@ -3,9 +3,23 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="csrf-token" content="{{ csrf_token() }}">
-<title>@yield('title', 'Sharekerjaid — Langkah baru untuk kariermu')</title>
-<meta name="description" content="@yield('description', 'Temukan peluang kerja dan perluas jangkauan rekrutmen bersama Sharekerjaid.')">
-<link rel="canonical" href="{{ url()->current() }}"><meta property="og:title" content="@yield('title', 'Sharekerjaid')"><meta property="og:image" content="{{ asset('images/sharekerjaid-logo.jpeg') }}">
+@php($siteTitle = 'Sharekerjaid — Lowongan Kerja dan Rekrutmen')
+@php($siteDescription = 'Temukan lowongan kerja dari perusahaan terverifikasi dan kelola rekrutmen di Sharekerjaid.')
+<title>@yield('title', $siteTitle)</title>
+<meta name="description" content="@yield('description', $siteDescription)">
+<link rel="icon" href="{{ asset('favicon.ico') }}" sizes="16x16 32x32 64x64">
+@if($indexable ?? false)
+<link rel="canonical" href="{{ $canonical }}">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="id_ID">
+<meta property="og:site_name" content="Sharekerjaid">
+<meta property="og:url" content="{{ $canonical }}">
+<meta property="og:title" content="@yield('title', $siteTitle)">
+<meta property="og:description" content="@yield('description', $siteDescription)">
+<meta property="og:image" content="@yield('image', asset('images/sharekerjaid-logo.jpeg'))">
+@else
+<meta name="robots" content="noindex, follow">
+@endif
 @vite(['resources/css/app.css','resources/js/app.js'])
 @stack('head')
 </head>

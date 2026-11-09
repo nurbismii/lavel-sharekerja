@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -21,6 +22,12 @@ class Company extends Model
     public function jobs(): HasMany
     {
         return $this->hasMany(JobPosting::class);
+    }
+
+    public function scopePublishable(Builder $query): Builder
+    {
+        return $query->where('status', 'ACTIVE')->where('verification_status', 'VERIFIED')
+            ->whereHas('owner', fn (Builder $owner) => $owner->where('status', 'ACTIVE'));
     }
 
     public function canPublish(): bool

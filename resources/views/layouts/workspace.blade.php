@@ -11,7 +11,7 @@
                 @endforeach
             @else
                 <a href="{{ route('dashboard') }}" @if(request()->routeIs('dashboard')) aria-current="page" @endif><x-workspace-icon name="grid" /><span>Ringkasan</span></a>
-                <a href="{{ route('dashboard') }}#lowongan" @if(request()->routeIs('recruiter.jobs.edit', 'recruiter.candidates')) aria-current="page" @endif><x-workspace-icon name="briefcase" /><span>Lowongan saya</span></a>
+                <a href="{{ route('dashboard') }}#lowongan" @if(request()->routeIs('recruiter.jobs.edit', 'recruiter.jobs.copy', 'recruiter.candidates')) aria-current="page" @endif><x-workspace-icon name="briefcase" /><span>Lowongan saya</span></a>
                 <a href="{{ auth()->user()->company ? route('recruiter.jobs.create') : route('recruiter.company') }}" @if(request()->routeIs('recruiter.jobs.create')) aria-current="page" @endif><x-workspace-icon name="users" /><span>Buat lowongan</span></a>
                 <a href="{{ route('recruiter.company') }}" @if(request()->routeIs('recruiter.company')) aria-current="page" @endif><x-workspace-icon name="building" /><span>Profil perusahaan</span></a>
                 <a href="{{ route('packages') }}" @if(request()->routeIs('packages')) aria-current="page" @endif><x-workspace-icon name="credit" /><span>Paket & kredit</span></a>

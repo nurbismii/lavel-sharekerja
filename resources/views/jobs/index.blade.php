@@ -1,5 +1,11 @@
 @extends('layouts.app')
-@section('title', $isHome ? 'Sharekerjaid — Langkah baru untuk kariermu' : 'Cari Lowongan — Sharekerjaid')
+@section('title', ($isHome ? 'Lowongan Kerja Terbaru di Indonesia' : 'Cari Lowongan Kerja').($jobs->currentPage() > 1 ? ' — Halaman '.$jobs->currentPage() : '').' | Sharekerjaid')
+@section('description', $isHome ? 'Temukan lowongan kerja terbaru dari perusahaan terverifikasi di Sharekerjaid. Jelajahi peluang karier dan lamar posisi yang sesuai.' : 'Cari lowongan berdasarkan posisi, kota, tipe kerja, dan kisaran gaji. Temukan pekerjaan on-site, hybrid, atau remote di Sharekerjaid.')
+@if($isHome && $indexable && $jobs->currentPage() === 1)
+@push('head')
+<script type="application/ld+json">{!! json_encode(['@context' => 'https://schema.org', '@type' => 'WebSite', 'name' => 'Sharekerjaid', 'url' => $canonical], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) !!}</script>
+@endpush
+@endif
 @section('content')
 @if($isHome)
 <section class="hero"><div class="container"><div class="row align-items-center g-5"><div class="col-lg-7">

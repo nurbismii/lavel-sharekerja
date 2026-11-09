@@ -40,12 +40,29 @@ class PlatformTest extends TestCase
 
     public function test_public_pages_render_and_hidden_salary_is_not_exposed(): void
     {
-        $job = JobPosting::factory()->published()->create();
-        $this->get('/')->assertOk()->assertSee('Langkah berikutnya');
-        $this->get(route('jobs.show', $job))->assertOk()->assertSee('Gaji tidak ditampilkan')->assertDontSee('7.000.000');
-        $this->get('/jobs?salary=100')->assertOk()->assertDontSee($job->title);
-        $this->get('/sitemap.xml')->assertOk()->assertSee($job->slug);
-        $this->get('/login')->assertOk();
+        $company = Company::factory()->create(['name' => 'Teknologi & Karier', 'logo_path' => 'company-logos/test.png']);
+        $job = JobPosting::factory()->published()->create(['company_id' => $company->id]);
+        $hiddenCompany = Company::factory()->create(['verification_status' => 'PENDING']);
+        $hiddenJob = JobPosting::factory()->published()->create(['company_id' => $hiddenCompany->id]);
+        $companyUrl = route('companies.show', $company->slug);
+        $jobUrl = route('jobs.show', $job);
+
+        $this->get('/')->assertOk()->assertSee('Langkah berikutnya')
+            ->assertSee('<title>Lowongan Kerja Terbaru di Indonesia | Sharekerjaid</title>', false)
+            ->assertSee('<link rel="icon" href="'.asset('favicon.ico').'"', false)
+            ->assertSee('"@type":"WebSite"', false);
+        $this->get($jobUrl.'?utm_source=email')->assertOk()
+            ->assertSee('<title>Lowongan Software Engineer di Teknologi &amp; Karier | Sharekerjaid</title>', false)
+            ->assertSee('<meta name="description" content="Lowongan Software Engineer di Teknologi &amp; Karier (Makassar).', false)
+            ->assertSee('<link rel="canonical" href="'.$jobUrl.'">', false)
+            ->assertSee('<meta property="og:description"', false)
+            ->assertSee('Gaji tidak ditampilkan')->assertDontSee('7.000.000')->assertDontSee('"baseSalary"', false);
+        $this->get($companyUrl)->assertOk()->assertSee('<title>Lowongan Kerja Teknologi &amp; Karier | Sharekerjaid</title>', false);
+        $this->get('/jobs?salary=100')->assertOk()->assertDontSee($job->title)->assertSee('noindex, follow');
+        $this->get('/robots.txt')->assertOk()->assertSee('Sitemap: '.route('sitemap'));
+        $this->get('/sitemap.xml')->assertOk()->assertSee($jobUrl)->assertSee($companyUrl)
+            ->assertDontSee($hiddenCompany->slug)->assertDontSee($hiddenJob->slug);
+        $this->get('/login')->assertOk()->assertSee('noindex, follow');
     }
 
     public function test_credit_reservation_publication_and_retry_are_consistent(): void
@@ -101,10 +118,19 @@ class PlatformTest extends TestCase
         $seeker = $this->account(Role::SEEKER);
         $job = JobPosting::factory()->published()->create(['method' => 'INTERNAL']);
         $payload = ['name' => 'Kandidat', 'phone' => '08123456', 'cv' => UploadedFile::fake()->createWithContent('cv.pdf', "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF")];
+        $jobUrl = route('jobs.show', $job);
+        $this->get($jobUrl)->assertOk()->assertSee('Lamar sekarang')->assertSee('"directApply":true', false);
         $this->actingAs($seeker)->post(route('applications.store', $job), $payload)->assertSessionHasNoErrors()->assertRedirect(route('dashboard'));
         $this->post(route('applications.store', $job), $payload)->assertRedirect();
         $this->assertSame(1, JobApplication::count());
+        JobApplication::firstOrFail()->update(['status' => 'SHORTLISTED']);
+        $this->get($jobUrl)->assertOk()->assertSee('Lihat lamaran saya')->assertSee('Kandidat pilihan')
+            ->assertSee('Diperbarui')->assertDontSee('Lamar sekarang');
+        $this->get(route('applications.create', $job))->assertRedirect(route('dashboard').'#lamaran');
+        $this->actingAs($this->account(Role::SEEKER))->get($jobUrl)->assertOk()
+            ->assertSee('Lamar sekarang')->assertDontSee('Kandidat pilihan');
         $job->update(['deadline' => now()->subMinute()]);
+        $this->actingAs($seeker)->get($jobUrl)->assertOk()->assertSee('Kandidat pilihan')->assertSee('Lowongan ini sudah ditutup');
         $this->get(route('applications.create', $job))->assertNotFound();
     }
 
@@ -200,8 +226,40 @@ class PlatformTest extends TestCase
         $published = JobPosting::factory()->published()->create();
         $this->get(route('jobs.show', $published))->assertSee('application/ld+json', false)->assertDontSee('7000000');
         $published->update(['deadline' => now()->subMinute()]);
-        $this->get(route('jobs.show', $published))->assertOk()->assertDontSee('application/ld+json', false);
+        $this->get(route('jobs.show', $published))->assertOk()->assertDontSee('application/ld+json', false)->assertSee('noindex, follow');
+        $this->get(route('sitemap'))->assertOk()->assertDontSee(route('jobs.show', $published));
         $this->get(route('jobs.external', $published))->assertNotFound();
+    }
+
+    public function test_recruiter_can_copy_an_old_job_into_a_new_draft(): void
+    {
+        $owner = $this->account(Role::RECRUITER);
+        $company = Company::factory()->create(['owner_user_id' => $owner->id]);
+        $original = JobPosting::factory()->published()->create([
+            'company_id' => $company->id, 'status' => 'CLOSED', 'deadline' => now()->subDay(),
+            'distributed_at' => now()->subDays(5), 'distribution_cursor' => 50,
+        ]);
+        $copyUrl = route('recruiter.jobs.copy', $original);
+
+        $this->actingAs($this->account(Role::RECRUITER))->get($copyUrl)->assertForbidden();
+        $this->actingAs($owner)->get(route('dashboard'))->assertOk()->assertSee($copyUrl);
+        $this->get($copyUrl)->assertOk()->assertSee('pilih tenggat baru')
+            ->assertViewHas('job', fn (JobPosting $draft) => ! $draft->exists && $draft->title === $original->title
+                && $draft->external_url === $original->external_url && $draft->deadline === null);
+        $this->assertDatabaseCount('job_postings', 1);
+
+        $payload = $original->only(array_keys(JobPostingRequest::publicationRules()));
+        $payload['deadline'] = now()->addWeek()->timezone(config('sharekerja.timezone'))->format('Y-m-d\TH:i');
+        $response = $this->post(route('recruiter.jobs.store'), $payload)->assertSessionHasNoErrors();
+        $draft = JobPosting::where('status', JobPosting::DRAFT)->sole();
+        $response->assertRedirect(route('recruiter.jobs.edit', $draft));
+        $this->assertDatabaseHas('job_postings', [
+            'id' => $draft->id, 'company_id' => $company->id, 'description' => $original->description,
+            'published_at' => null, 'expires_at' => null, 'distributed_at' => null, 'distribution_cursor' => 0, 'credit_reserved' => false,
+        ]);
+        $this->assertSame(JobPosting::CLOSED, $original->fresh()->status);
+        $this->assertSame(0, $owner->fresh()->reserved_credits);
+        $this->get(route('recruiter.jobs.copy', $draft))->assertNotFound();
     }
 
     public function test_refund_hold_prevents_credit_spend_and_completion_is_idempotent(): void

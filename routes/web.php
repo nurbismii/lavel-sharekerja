@@ -36,8 +36,14 @@ Route::get('/auth/google/callback', [AuthController::class, 'callback'])->middle
 Route::get('/unsubscribe/{token}', [SubscriptionController::class, 'unsubscribe'])->name('unsubscribe');
 Route::post('/unsubscribe/{token}', [SubscriptionController::class, 'stop'])->middleware('throttle:10,1')->name('unsubscribe.stop');
 Route::post('/webhooks/midtrans', [PurchaseController::class, 'webhook'])->name('midtrans.webhook');
+Route::get('/robots.txt', function () {
+    return response("User-agent: *\nDisallow:\n\nSitemap: ".route('sitemap')."\n", 200, ['Content-Type' => 'text/plain; charset=UTF-8']);
+});
 Route::get('/sitemap.xml', function () {
-    return response()->view('sitemap', ['jobs' => JobPosting::live()->select('slug', 'updated_at')->limit(10000)->get()])->header('Content-Type', 'application/xml');
+    return response()->view('sitemap', [
+        'jobs' => JobPosting::live()->select('slug', 'updated_at')->orderBy('id')->limit(10000)->get(),
+        'companies' => Company::publishable()->select('slug', 'updated_at')->orderBy('id')->limit(10000)->get(),
+    ])->header('Content-Type', 'application/xml; charset=UTF-8');
 })->name('sitemap');
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
@@ -61,6 +67,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/jobs/create', [RecruiterController::class, 'create'])->name('recruiter.jobs.create');
         Route::post('/jobs', [RecruiterController::class, 'store'])->name('recruiter.jobs.store');
         Route::get('/jobs/{job}/edit', [RecruiterController::class, 'edit'])->name('recruiter.jobs.edit');
+        Route::get('/jobs/{job}/copy', [RecruiterController::class, 'copy'])->name('recruiter.jobs.copy');
         Route::put('/jobs/{job}', [RecruiterController::class, 'update'])->name('recruiter.jobs.update');
         Route::post('/jobs/{job}/status', [RecruiterController::class, 'transition'])->name('recruiter.jobs.status');
         Route::get('/jobs/{job}/candidates', [ApplicationController::class, 'candidates'])->name('recruiter.candidates');
